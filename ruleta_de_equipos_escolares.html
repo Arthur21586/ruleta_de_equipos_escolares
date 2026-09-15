@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ruleta de Equipos Escolares</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .wheel-container {
+            position: relative;
+            width: 320px;
+            height: 320px;
+            max-width: 90vw;
+            max-height: 90vw;
+            margin: 0 auto;
+        }
+        @media (min-width: 640px) {
+            .wheel-container {
+                width: 420px;
+                height: 420px;
+            }
+        }
+        #wheelCanvas {
+            transition: transform 4s cubic-bezier(0.15, 0.95, 0.15, 1);
+        }
+        .pointer {
+            position: absolute;
+            top: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 18px solid transparent;
+            border-right: 18px solid transparent;
+            border-top: 35px solid #ef4444;
+            z-index: 50;
+            filter: drop-shadow(0 4px 6px rgba(0,0,0,0.2));
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-indigo-50 via-slate-50 to-blue-100 min-h-full text-slate-800 flex flex-col justify-between">
+
+    <header class="bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-40 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap items-center justify-between gap-4">
+            <div class="flex items-center space-x-3">
+                <div class="bg-indigo-600 text-white p-2.5 rounded-xl shadow-md flex items-center justify-center">
+                    <i class="fa-solid fa-dharmachakra text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-extrabold text-slate-900 tracking-tight">SorteoEscolar</h1>
+                    <p class="text-xs text-slate-500">Ruleta Interactiva para Equipos</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center space-x-3">
+                <button id="soundToggleBtn" onclick="toggleSound()" class="flex items-center space-x-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-3.5 py-2 rounded-xl text-sm font-medium transition shadow-sm border border-slate-200">
+                    <i id="soundIcon" class="fa-solid fa-volume-high text-indigo-600"></i>
+                    <span id="soundText" class="hidden sm:inline">Sonido activado</span>
+                </button>
+                <div class="bg-indigo-100 text-indigo-800 px-3 py-1.5 rounded-xl text-xs font-semibold border border-indigo-200">
+                    <span id="badgeStudentCount">0</span> alumnos listos
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-grow w-full grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <div class="lg:col-span-4 flex flex-col space-y-6">
+            
+            <!-- Panel Alumnos -->
+            <div class="bg-white rounded-2xl shadow-xl border border-slate-200/80 p-5 flex flex-col space-y-4">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
+                        <i class="fa-solid fa-users text-indigo-600"></i> Alumnos
+                    </h2>
+                    <span id="totalBadge" class="text-xs bg-slate-100 text-slate-600 font-bold px-2.5 py-1 rounded-full">0 registrados</span>
+                </div>
+
+                <div class="space-y-2">
+                    <label for="studentInput" class="text-xs font-semibold text-slate-600">Pega o escribe los nombres (un alumno por línea):</label>
+                    <textarea id="studentInput" rows="4" class="w-full p-3 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition resize-none custom-scrollbar" placeholder="Juan Pérez&#10;María López&#10;Carlos Hernández"></textarea>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <button onclick="addStudents()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 px-4 rounded-xl text-sm transition shadow-md shadow-indigo-100 flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-user-plus"></i> Agregar
+                    </button>
+                    <button onclick="clearStudents()" class="bg-slate-100 hover:bg-rose-50 text-slate-700 hover:text-rose-600 font-medium py-2.5 px-4 rounded-xl text-sm transition border border-slate-200 flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-trash-can"></i> Limpiar
+                    </button>
+                </div>
+
+                <!-- Lista expandible de alumnos -->
+                <div class="border-t border-slate-100 pt-3">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Lista actual</span>
+                        <span id="remainingCount" class="text-xs text-indigo-600 font-semibold">Pendientes: 0</span>
+                    </div>
+                    <div id="studentListContainer" class="max-h-40 overflow-y-auto custom-scrollbar space-y-1 pr-1">
+                        <p class="text-xs text-slate-400 italic text-center py-4">Agrega a tus alumnos para comenzar</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Panel Configuración de Equipos -->
+            <div class="bg-white rounded-2xl shadow-xl border border-slate-200/80 p-5 flex flex-col space-y-4">
+                <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
+                    <i class="fa-solid fa-gear text-indigo-600"></i> Configuración de Equipos
+                </h2>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-xs font-semibold text-slate-600 block mb-1">Modo de división</label>
+                        <select id="configMode" onchange="switchConfigMode()" class="w-full p-2.5 text-xs border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none">
+                            <option value="teamsCount">Número de equipos</option>
+                            <option value="membersCount">Alumnos por equipo</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label id="configLabel" class="text-xs font-semibold text-slate-600 block mb-1">¿Cuántos equipos?</label>
+                        <input type="number" id="configValue" min="1" value="4" class="w-full p-2.5 text-xs border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-center">
+                    </div>
+                </div>
+
+                <div id="configSummaryText" class="text-xs text-slate-500 bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-center">
+                    Se formarán 4 equipos equilibrados.
+                </div>
+
+                <div class="pt-2 border-t border-slate-100 flex gap-2">
+                    <button onclick="prepareTeamsConfig()" class="flex-1 bg-slate-800 hover:bg-slate-900 text-white font-medium py-2.5 px-4 rounded-xl text-sm transition shadow-md flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-check"></i> Aplicar
+                    </button>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="lg:col-span-8 flex flex-col space-y-6">
+            
+            <!-- Selector de Modalidad -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-2 flex gap-2">
+                <button id="modeWheelBtn" onclick="switchMode('wheel')" class="flex-1 py-3 px-4 rounded-xl text-sm font-bold transition flex items-center justify-center gap-2 bg-indigo-600 text-white shadow-md">
+                    <i class="fa-solid fa-dharmachakra"></i> Modo Ruleta
+                </button>
+                <button id="modeQuickBtn" onclick="switchMode('quick')" class="flex-1 py-3 px-4 rounded-xl text-sm font-bold transition flex items-center justify-center gap-2 text-slate-600 hover:bg-slate-50">
+                    <i class="fa-solid fa-bolt"></i> Sorteo Rápido
+                </button>
+            </div>
+
+            <!-- CONTENEDOR MODO RULETA -->
+            <div id="wheelSection" class="bg-white rounded-2xl shadow-xl border border-slate-200/80 p-6 flex flex-col items-center justify-center relative overflow-hidden">
+                
+                <!-- Alerta estado actual -->
+                <div id="rouletteStatus" class="mb-4 text-sm font-bold text-indigo-600 bg-indigo-50 px-4 py-1.5 rounded-full border border-indigo-100 text-center">
+                    Agrega a tus alumnos para comenzar
+                </div>
+
+                <!-- Ruleta Visual -->
+                <div class="wheel-container my-4">
+                    <div class="pointer"></div>
+                    <canvas id="wheelCanvas" width="420" height="420" class="w-full h-full rounded-full shadow-2xl border-4 border-white"></canvas>
+                    <!-- Centro de la ruleta -->
+                    <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-16 h-16 bg-white rounded-full shadow-lg border-4 border-indigo-600 flex items-center justify-center z-30">
+                        <i class="fa-solid fa-graduation-cap text-indigo-600 text-xl"></i>
+                    </div>
+                </div>
+
+                <!-- Controles de Ruleta -->
+                <div class="mt-6 flex flex-wrap items-center justify-center gap-3 w-full max-w-md">
+                    <button id="spinBtn" onclick="spinWheel()" class="flex-1 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-extrabold py-3.5 px-6 rounded-xl shadow-lg shadow-emerald-200 text-base transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                        <i class="fa-solid fa-play"></i> GIRAR RULETA
+                    </button>
+                    <button onclick="resetAssignment()" class="bg-slate-100 hover:bg-rose-50 text-slate-700 hover:text-rose-600 font-semibold py-3.5 px-4 rounded-xl text-sm transition border border-slate-200 flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-rotate-right"></i> Reiniciar
+                    </button>
+                </div>
+            </div>
+
+            <!-- CONTENEDOR MODO SORTEO RÁPIDO (Oculto por defecto) -->
+            <div id="quickSection" class="bg-white rounded-2xl shadow-xl border border-slate-200/80 p-8 flex flex-col items-center justify-center text-center hidden space-y-6">
+                <div class="w-20 h-20 bg-indigo-50 text-indigo-600 rounded-3xl flex items-center justify-center text-3xl shadow-inner">
+                    <i class="fa-solid fa-bolt animate-bounce"></i>
+                </div>
+                <div class="max-w-md">
+                    <h3 class="text-xl font-extrabold text-slate-900 mb-2">Sorteo Rápido y Automático</h3>
+                    <p class="text-sm text-slate-500 mb-6">Mezcla instantáneamente a todos los alumnos registrados y los distribuye de forma equilibrada en los equipos configurados sin esperas.</p>
+                </div>
+                <button onclick="runQuickDraw()" class="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-extrabold py-4 px-8 rounded-2xl shadow-xl shadow-indigo-200 text-base transition flex items-center justify-center gap-3">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> Ejecutar Sorteo Rápido
+                </button>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-xl border border-slate-200/80 p-6 flex flex-col space-y-4">
+                <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                    <h3 class="text-base font-bold text-slate-800 flex items-center gap-2">
+                        <i class="fa-solid fa-people-group text-indigo-600"></i> Equipos Formados
+                    </h3>
+                    <div class="flex gap-2">
+                        <button onclick="viewFinalTeamsModal()" class="text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold px-3 py-1.5 rounded-lg transition border border-indigo-100 flex items-center gap-1.5">
+                            <i class="fa-solid fa-expand"></i> Ver pantalla completa
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Grid de tarjetas de equipos -->
+                <div id="teamsGridContainer" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                    <div class="col-span-full py-12 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                        <i class="fa-solid fa-layer-group text-3xl text-slate-300 mb-2"></i>
+                        <p class="text-sm text-slate-400 font-medium">Los equipos aparecerán aquí una vez que comiences el sorteo.</p>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <div id="selectionModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 text-center transform transition-all scale-95 opacity-0 duration-300" id="modalContentBox">
+            <div class="w-20 h-20 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4 shadow-inner">
+                <i class="fa-solid fa-award"></i>
+            </div>
+            <span class="text-xs font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full">¡Alumno seleccionado!</span>
+            <h3 id="modalStudentName" class="text-2xl font-extrabold text-slate-900 mt-3 mb-1">Nombre del Alumno</h3>
+            <p id="modalTeamAssigned" class="text-sm font-semibold text-slate-600 mb-6">Asignado al Equipo 1</p>
+            <button onclick="closeSelectionModal()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 px-6 rounded-xl text-sm transition shadow-lg shadow-indigo-100">
+                Continuar
+            </button>
+        </div>
+    </div>
+
+    <footer class="bg-white border-t border-slate-200 mt-12 py-4 text-center text-xs text-slate-400">
+        Aplicación escolar interactiva para docentes • Todo el procesamiento ocurre de forma local en tu navegador.
+    </footer>
+
+    <script>
+        // Estado global de la aplicación
+        let students = [];
+        let assignedStudents = []; // Alumnos que ya salieron de la ruleta
+        let teamsConfigCount = 4;
+        let configModeType = 'teamsCount'; // 'teamsCount' o 'membersCount'
+        let teamsData = {}; // { 1: [alumno1, alumno2], 2: [...] }
+        let currentAssignedRoundIndex = 0;
+        let isSpinning = false;
+        let soundEnabled = true;
+        let currentActiveMode = 'wheel'; // 'wheel' o 'quick'
+
+        // Paleta de colores atractivos para los equipos y ruleta
+        const colorPalette = [
+            { bg: '#fef3c7', text: '#d97706', border: '#f59e0b', badge: 'bg-amber-100 text-amber-800 border-amber-200', headerBg: 'bg-amber-500' },
+            { bg: '#e0e7ff', text: '#4f46e5', border: '#6366f1', badge: 'bg-indigo-100 text-indigo-800 border-indigo-200', headerBg: 'bg-indigo-600' },
+            { bg: '#d1fae5', text: '#059669', border: '#10b981', badge: 'bg-emerald-100 text-emerald-800 border-emerald-200', headerBg: 'bg-emerald-600' },
+            { bg: '#fee2e2', text: '#dc2626', border: '#ef4444', badge: 'bg-rose-100 text-rose-800 border-rose-200', headerBg: 'bg-rose-600' },
+            { bg: '#fae8ff', text: '#c026d3', border: '#d946ef', badge: 'bg-fuchsia-100 text-fuchsia-800 border-fuchsia-200', headerBg: 'bg-fuchsia-600' },
+            { bg: '#ccfbf1', text: '#0d9488', border: '#14b8a6', badge: 'bg-teal-100 text-teal-800 border-teal-200', headerBg: 'bg-teal-600' },
+            { bg: '#ffedd5', text: '#ea580c', border: '#f97316', badge: 'bg-orange-100 text-orange-800 border-orange-200', headerBg: 'bg-orange-600' },
+            { bg: '#e0f2fe', text: '#0284c7', border: '#38bdf8', badge: 'bg-sky-100 text-sky-800 border-sky-200', headerBg: 'bg-sky-600' }
+        ];
+
+        // Inicialización al cargar la ventana
+        window.onload = function() {
+            loadFromLocalStorage();
+            updateAllUI();
+            drawWheel();
+        };
+
+        // --- SISTEMA DE AUDIO (Efectos sintéticos con Web Audio API) ---
+        let audioCtx = null;
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        function playSound(type) {
+            if (!soundEnabled) return;
+            try {
+                initAudio();
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                const now = audioCtx.currentTime;
+                if (type === 'tick') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(400, now);
+                    osc.frequency.exponentialRampToValueAtTime(200, now + 0.05);
+                    gain.gain.setValueAtTime(0.1, now);
+                    gain.gain.linearRampToValueAtTime(0.01, now + 0.05);
+                    osc.start(now);
+                    osc.stop(now + 0.05);
+                } else if (type === 'select') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(300, now);
+                    osc.frequency.exponentialRampToValueAtTime(800, now + 0.3);
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.linearRampToValueAtTime(0.01, now + 0.3);
+                    osc.start(now);
+                    osc.stop(now + 0.3);
+                } else if (type === 'complete') {
+                    // Acorde de celebración
+                    [523.25, 659.25, 783.99, 1046.50].forEach((freq, idx) => {
+                        const o = audioCtx.createOscillator();
+                        const g = audioCtx.createGain();
+                        o.connect(g);
+                        g.connect(audioCtx.destination);
+                        o.frequency.setValueAtTime(freq, now + idx * 0.1);
+                        g.gain.setValueAtTime(0.15, now + idx * 0.1);
+                        g.gain.linearRampToValueAtTime(0.001, now + idx * 0.1 + 0.5);
+                        o.start(now + idx * 0.1);
+                        o.stop(now + idx * 0.1 + 0.5);
+                    });
+                }
+            } catch (e) {
+                console.error("Audio error:", e);
+            }
+        }
+
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            const icon = document.getElementById('soundIcon');
+            const text = document.getElementById('soundText');
+            if (soundEnabled) {
+                icon.className = "fa-solid fa-volume-high text-indigo-600";
+                text.innerText = "Sonido activado";
+            } else {
+                icon.className = "fa-solid fa-volume-xmark text-slate-400";
+                text.innerText = "Sonido desactivado";
+            }
+        }
+
+        // --- GESTIÓN DE ALUMNOS ---
+        function addStudents() {
+            const input = document.getElementById('studentInput');
+            const rawText = input.value.trim();
+            if (!rawText) {
+                showToast("Por favor escribe o pega al menos un nombre.", "error");
+                return;
+            }
+
+            const lines = rawText.split('\n');
+            let addedCount = 0;
+            lines.forEach(line => {
+                const name = line.trim();
+                if (name && !students.includes(name)) {
+                    students.push(name);
+                    addedCount++;
+                }
+            });
+
+            if (addedCount > 0) {
+                input.value = '';
+                saveToLocalStorage();
+                resetAssignmentData();
+                updateAllUI();
+                showToast(`Se agregaron ${addedCount} alumnos correctamente.`);
+            } else {
+                showToast("No se agregaron nuevos alumnos (pueden estar duplicados).", "error");
+            }
+        }
+
+        function removeStudent(index) {
+            students.splice(index, 1);
+            saveToLocalStorage();
+            resetAssignmentData();
+            updateAllUI();
+        }
+
+        function clearStudents() {
+            if (students.length === 0) return;
+            if (confirm("¿Estás seguro de limpiar toda la lista de alumnos?")) {
+                students = [];
+                saveToLocalStorage();
+                resetAssignmentData();
+                updateAllUI();
+                showToast("Lista de alumnos vaciada.");
+            }
+        }
+
+        function saveToLocalStorage() {
+            try {
+                localStorage.setItem('school_students', JSON.stringify(students));
+            } catch (e) {}
+        }
+
+        function loadFromLocalStorage() {
+            try {
+                const saved = localStorage.getItem('school_students');
+                if (saved) {
+                    students = JSON.parse(saved);
+                }
+            } catch (e) {}
+        }
+
+        // --- CONFIGURACIÓN DE EQUIPOS ---
+        function switchConfigMode() {
+            const mode = document.getElementById('configMode').value;
+            configModeType = mode;
+            const label = document.getElementById('configLabel');
+            const input = document.getElementById('configValue');
+            if (mode === 'teamsCount') {
+                label.innerText = "¿Cuántos equipos?";
+                input.value = 4;
+            } else {
+                label.innerText = "¿Alumnos por equipo?";
+                input.value = 3;
+            }
+            updateConfigSummary();
+        }
+
+        function prepareTeamsConfig() {
+            const val = parseInt(document.getElementById('configValue').value);
+            if (isNaN(val) || val < 1) {
+                showToast("Por favor ingresa un número válido.", "error");
+                return;
+            }
+
+            if (students.length === 0) {
+                showToast("Primero debes agregar alumnos.", "error");
+                return;
+            }
+
+            if (configModeType === 'teamsCount') {
+                if (val > students.length) {
+                    showToast("Hay más equipos solicitados que alumnos totales.", "error");
+                    return;
+                }
+                teamsConfigCount = val;
+            } else {
+                // Modo alumnos por equipo
+                teamsConfigCount = Math.ceil(students.length / val);
+            }
+
+            resetAssignmentData();
+            updateConfigSummary();
+            showToast(`Configuración aplicada: ${teamsConfigCount} equipos.`);
+        }
+
+        function updateConfigSummary() {
+            const val = parseInt(document.getElementById('configValue').value) || 1;
+            let text = "";
+            if (configModeType === 'teamsCount') {
+                text = `Se formarán ${val} equipos equilibrados.`;
+            } else {
+                const calculatedTeams = Math.ceil(students.length / val);
+                text = `Aproximadamente ${calculatedTeams} equipos con ${val} alumnos cada uno.`;
+            }
+            document.getElementById('configSummaryText').innerText = text;
+        }
+
+        function resetAssignmentData() {
+            assignedStudents = [];
+            teamsData = {};
+            for (let i = 1; i <= teamsConfigCount; i++) {
+                teamsData[i] = [];
+            }
+            currentAssignedRoundIndex = 1;
+            updateAllUI();
+            drawWheel();
+        }
+
+        function resetAssignment() {
+            resetAssignmentData();
+            showToast("Asignación reiniciada. Todos los alumnos vuelven a la ruleta.");
+        }
+
+        // --- INTERFAZ Y RENDERIZADO GENERAL ---
+        function updateAllUI() {
+            document.getElementById('badgeStudentCount').innerText = students.length;
+            document.getElementById('totalBadge').innerText = `${students.length} registrados`;
+
+            const remaining = students.filter(s => !assignedStudents.includes(s));
+            document.getElementById('remainingCount').innerText = `Pendientes: ${remaining.length}`;
+
+            // Renderizar lista de alumnos en panel izquierdo
+            const container = document.getElementById('studentListContainer');
+            if (students.length === 0) {
+                container.innerHTML = `<p class="text-xs text-slate-400 italic text-center py-4">Agrega a tus alumnos para comenzar</p>`;
+            } else {
+                container.innerHTML = students.map((stu, idx) => {
+                    const isAssigned = assignedStudents.includes(stu);
+                    return `
+                        <div class="flex items-center justify-between p-2 rounded-lg text-xs ${isAssigned ? 'bg-slate-100 text-slate-400 line-through' : 'bg-indigo-50/50 text-slate-700 border border-indigo-50'}">
+                            <span class="font-medium truncate max-w-[180px]">${idx + 1}. ${stu}</span>
+                            <button onclick="removeStudent(${idx})" class="text-slate-400 hover:text-rose-600 p-1 transition" title="Eliminar alumno">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            // Renderizar tarjetas de equipos
+            renderTeamsGrid();
+
+            // Estado de ruleta
+            const spinBtn = document.getElementById('spinBtn');
+            const statusDiv = document.getElementById('rouletteStatus');
+            if (students.length === 0) {
+                spinBtn.disabled = true;
+                statusDiv.innerText = "Agrega a tus alumnos para comenzar";
+            } else if (remaining.length === 0) {
+                spinBtn.disabled = true;
+                statusDiv.innerText = "¡Todos los alumnos han sido asignados!";
+            } else {
+                spinBtn.disabled = false;
+                statusDiv.innerText = `Turno de asignar al Equipo ${currentAssignedRoundIndex} (${remaining.length} alumnos pendientes)`;
+            }
+        }
+
+        function renderTeamsGrid() {
+            const grid = document.getElementById('teamsGridContainer');
+            const activeTeamsCount = Object.keys(teamsData).length;
+
+            if (activeTeamsCount === 0 || students.length === 0) {
+                grid.innerHTML = `
+                    <div class="col-span-full py-12 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                        <i class="fa-solid fa-layer-group text-3xl text-slate-300 mb-2"></i>
+                        <p class="text-sm text-slate-400 font-medium">Los equipos aparecerán aquí una vez que comiences el sorteo.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '';
+            for (let i = 1; i <= teamsConfigCount; i++) {
+                const members = teamsData[i] || [];
+                const palette = colorPalette[(i - 1) % colorPalette.length];
+                html += `
+                    <div class="bg-white rounded-2xl border border-slate-200/80 shadow-md overflow-hidden flex flex-col transition hover:shadow-lg">
+                        <div class="${palette.headerBg} text-white px-4 py-3 flex items-center justify-between">
+                            <h4 class="font-bold text-sm flex items-center gap-2">
+                                <i class="fa-solid fa-shield-halved"></i> Equipo ${i}
+                            </h4>
+                            <span class="bg-white/20 px-2.5 py-0.5 rounded-full text-xs font-semibold">${members.length} miembros</span>
+                        </div>
+                        <div class="p-4 flex-grow bg-slate-50/50 min-h-[120px] max-h-52 overflow-y-auto custom-scrollbar">
+                            ${members.length === 0 ? '<p class="text-xs text-slate-400 italic text-center py-6">Sin integrantes aún</p>' : 
+                                '<ul class="space-y-1.5">' + members.map(m => `<li class="text-xs font-medium text-slate-700 bg-white px-3 py-2 rounded-xl shadow-xs border border-slate-100 flex items-center gap-2"><i class="fa-solid fa-user text-indigo-500 text-[10px]"></i> ${m}</li>`).join('') + '</ul>'
+                            }
+                        </div>
+                    </div>
+                `;
+            }
+            grid.innerHTML = html;
+        }
+
+        // --- DIBUJO DE LA RULETA (Canvas) ---
+        let currentWheelAngle = 0;
+
+        function drawWheel() {
+            const canvas = document.getElementById('wheelCanvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const width = canvas.width;
+            const height = canvas.height;
+            const center = width / 2;
+            const radius = center - 10;
+
+            ctx.clearRect(0, 0, width, height);
+
+            const remaining = students.filter(s => !assignedStudents.includes(s));
+
+            if (remaining.length === 0) {
+                // Ruleta vacía
+                ctx.beginPath();
+                ctx.arc(center, center, radius, 0, 2 * Math.PI);
+                ctx.fillStyle = '#f1f5f9';
+                ctx.fill();
+                ctx.lineWidth = 6;
+                ctx.strokeStyle = '#cbd5e1';
+                ctx.stroke();
+
+                ctx.fillStyle = '#64748b';
+                ctx.font = 'bold 14px Inter, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('¡Completado!', center, center);
+                return;
+            }
+
+            const sliceAngle = (2 * Math.PI) / remaining.length;
+
+            remaining.forEach((student, index) => {
+                const startAngle = index * sliceAngle;
+                const endAngle = (index + 1) * sliceAngle;
+                const palette = colorPalette[index % colorPalette.length];
+
+                // Dibujar sector
+                ctx.beginPath();
+                ctx.moveTo(center, center);
+                ctx.arc(center, center, radius, startAngle, endAngle);
+                ctx.closePath();
+                ctx.fillStyle = palette.border;
+                ctx.fill();
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = '#ffffff';
+                ctx.stroke();
+
+                // Dibujar texto
+                ctx.save();
+                ctx.translate(center, center);
+                ctx.rotate(startAngle + sliceAngle / 2);
+                ctx.textAlign = 'right';
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 12px Inter, sans-serif';
+                ctx.fillText(student.length > 15 ? student.substring(0, 12) + '...' : student, radius - 20, 4);
+                ctx.restore();
+            });
+        }
+
+        // --- GIRO DE LA RULETA ---
+        function spinWheel() {
+            const remaining = students.filter(s => !assignedStudents.includes(s));
+            if (remaining.length === 0) {
+                showToast("Todos los alumnos ya fueron asignados.", "error");
+                return;
+            }
+            if (isSpinning) return;
+            isSpinning = true;
+
+            const spinBtn = document.getElementById('spinBtn');
+            spinBtn.disabled = true;
+
+            // Selección verdaderamente aleatoria mediante Math.random()
+            const randomIndex = Math.floor(Math.random() * remaining.length);
+            const selectedStudent = remaining[randomIndex];
+
+            const canvas = document.getElementById('wheelCanvas');
+            const totalSlices = remaining.length;
+            const sliceAngleDeg = 360 / totalSlices;
+
+            // Calcular ángulo para que el puntero (arriba: 270 grados o -90) apunte al sector seleccionado
+            // El sector index va desde randomIndex * sliceAngleDeg hasta (randomIndex + 1) * sliceAngleDeg
+            const targetSectorCenterAngle = (randomIndex * sliceAngleDeg) + (sliceAngleDeg / 2);
+            // Queremos que targetSectorCenterAngle quede en la parte superior (270 grados)
+            const extraSpins = 5 * 360; // 5 vueltas completas
+            const targetAngle = extraSpins + (270 - targetSectorCenterAngle);
+
+            currentWheelAngle += targetAngle - (currentWheelAngle % 360);
+            canvas.style.transform = `rotate(${currentWheelAngle}deg)`;
+
+            // Reproducir sonido de giro simulado
+            let tickCount = 0;
+            const tickInterval = setInterval(() => {
+                playSound('tick');
+                tickCount++;
+                if (tickCount > 35) clearInterval(tickInterval);
+            }, 100);
+
+            // Al finalizar animación (4 segundos)
+            setTimeout(() => {
+                clearInterval(tickInterval);
+                isSpinning = false;
+                spinBtn.disabled = false;
+                playSound('select');
+
+                // Asignar alumno al equipo correspondiente
+                assignStudentToTeam(selectedStudent);
+            }, 4000);
+        }
+
+        function assignStudentToTeam(student) {
+            assignedStudents.push(student);
+            if (!teamsData[currentAssignedRoundIndex]) {
+                teamsData[currentAssignedRoundIndex] = [];
+            }
+            teamsData[currentAssignedRoundIndex].push(student);
+
+            // Mostrar modal de selección
+            showSelectionModal(student, currentAssignedRoundIndex);
+
+            // Siguiente ronda de equipo (cíclica)
+            currentAssignedRoundIndex++;
+            if (currentAssignedRoundIndex > teamsConfigCount) {
+                currentAssignedRoundIndex = 1;
+            }
+
+            updateAllUI();
+            drawWheel();
+
+            // Comprobar si terminaron todos
+            if (assignedStudents.length === students.length) {
+                setTimeout(() => {
+                    triggerCelebration();
+                }, 500);
+            }
+        }
+
+        // --- MODAL DE SELECCIÓN ---
+        function showSelectionModal(studentName, teamNum) {
+            const modal = document.getElementById('selectionModal');
+            const box = document.getElementById('modalContentBox');
+            document.getElementById('modalStudentName').innerText = studentName;
+            document.getElementById('modalTeamAssigned').innerText = `¡Asignado al Equipo ${teamNum}!`;
+
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                box.classList.remove('scale-95', 'opacity-0');
+                box.classList.add('scale-100', 'opacity-100');
+            }, 10);
+        }
+
+        function closeSelectionModal() {
+            const modal = document.getElementById('selectionModal');
+            const box = document.getElementById('modalContentBox');
+            box.classList.remove('scale-100', 'opacity-100');
+            box.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 300);
+        }
+
+        // --- MODO SORTEO RÁPIDO ---
+        function switchMode(mode) {
+            currentActiveMode = mode;
+            const wheelBtn = document.getElementById('modeWheelBtn');
+            const quickBtn = document.getElementById('modeQuickBtn');
+            const wheelSec = document.getElementById('wheelSection');
+            const quickSec = document.getElementById('quickSection');
+
+            if (mode === 'wheel') {
+                wheelBtn.className = "flex-1 py-3 px-4 rounded-xl text-sm font-bold transition flex items-center justify-center gap-2 bg-indigo-600 text-white shadow-md";
+                quickBtn.className = "flex-1 py-3 px-4 rounded-xl text-sm font-bold transition flex items-center justify-center gap-2 text-slate-600 hover:bg-slate-50";
+                wheelSec.classList.remove('hidden');
+                quickSec.classList.add('hidden');
+                drawWheel();
+            } else {
+                quickBtn.className = "flex-1 py-3 px-4 rounded-xl text-sm font-bold transition flex items-center justify-center gap-2 bg-indigo-600 text-white shadow-md";
+                wheelBtn.className = "flex-1 py-3 px-4 rounded-xl text-sm font-bold transition flex items-center justify-center gap-2 text-slate-600 hover:bg-slate-50";
+                quickSec.classList.remove('hidden');
+                wheelSec.classList.add('hidden');
+            }
+        }
+
+        function runQuickDraw() {
+            if (students.length === 0) {
+                showToast("Agrega alumnos antes de ejecutar el sorteo rápido.", "error");
+                return;
+            }
+
+            // Mezclar aleatoriamente (Algoritmo Fisher-Yates con Math.random verdadero)
+            let shuffled = [...students];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+
+            // Reiniciar equipos
+            teamsData = {};
+            for (let i = 1; i <= teamsConfigCount; i++) {
+                teamsData[i] = [];
+            }
+
+            // Distribuir equitativamente
+            shuffled.forEach((student, index) => {
+                const teamIndex = (index % teamsConfigCount) + 1;
+                teamsData[teamIndex].push(student);
+            });
+
+            assignedStudents = [...students];
+            currentAssignedRoundIndex = 1;
+
+            playSound('complete');
+            updateAllUI();
+            triggerCelebration();
+            showToast("¡Sorteo rápido completado con éxito!");
+        }
+
+        // --- CELEBRACIÓN Y CONFETI ---
+        function triggerCelebration() {
+            playSound('complete');
+            confetti({
+                particleCount: 120,
+                spread: 80,
+                origin: { y: 0.6 }
+            });
+        }
+
+        // --- VISTA DE PANTALLA COMPLETA DE EQUIPOS ---
+        function viewFinalTeamsModal() {
+            if (students.length === 0) {
+                showToast("No hay alumnos ni equipos formados.", "error");
+                return;
+            }
+            triggerCelebration();
+            showToast("¡Equipos listos para proyectar en clase!");
+        }
+
+        // --- SISTEMA DE TOASTS ---
+        function showToast(message, type = 'success') {
+            const existing = document.getElementById('customToast');
+            if (existing) existing.remove();
+
+            const toast = document.createElement('div');
+            toast.id = 'customToast';
+            toast.className = `fixed bottom-6 right-6 z-50 px-5 py-3 rounded-2xl shadow-2xl text-white font-medium text-sm flex items-center gap-3 transform translate-y-10 opacity-0 transition-all duration-300 ${type === 'error' ? 'bg-rose-600' : 'bg-slate-900'}`;
+            toast.innerHTML = `<i class="fa-solid ${type === 'error' ? 'fa-circle-exclamation' : 'fa-circle-check'} text-base"></i> <span>${message}</span>`;
+            document.body.appendChild(toast);
+
+            setTimeout(() => {
+                toast.classList.remove('translate-y-10', 'opacity-0');
+            }, 10);
+
+            setTimeout(() => {
+                toast.classList.add('translate-y-10', 'opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 3500);
+        }
+    </script>
+</body>
+</html>
